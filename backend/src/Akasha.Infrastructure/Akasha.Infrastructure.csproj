@@ -1,0 +1,8 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Akasha.Application\Akasha.Application.csproj" />
+    <ProjectReference Include="..\Akasha.Domain\Akasha.Domain.csproj" />
+  </ItemGroup>
+
+</Project>

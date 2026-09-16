@@ -1,0 +1,10 @@
+@Akasha_Api_HostAddress = http://localhost:5257
+
+GET {{Akasha_Api_HostAddress}}/health
+
+###
+
+GET {{Akasha_Api_HostAddress}}/openapi/v1.json
+Accept: application/json
+
+###

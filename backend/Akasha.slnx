@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Akasha.Api/Akasha.Api.csproj" />
+    <Project Path="src/Akasha.Application/Akasha.Application.csproj" />
+    <Project Path="src/Akasha.Domain/Akasha.Domain.csproj" />
+    <Project Path="src/Akasha.Infrastructure/Akasha.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Akasha.ArchitectureTests/Akasha.ArchitectureTests.csproj" />
+  </Folder>
+</Solution>

@@ -12,8 +12,14 @@ Akasha DMS ist ein webbasiertes Dokumentenmanagementsystem mit einer getrennten 
 ```text
 akasha-dms/
 ├── backend/
-│   ├── *.csproj
-│   └── ...
+│   ├── Akasha.slnx
+│   ├── src/
+│   │   ├── Akasha.Api/
+│   │   ├── Akasha.Application/
+│   │   ├── Akasha.Domain/
+│   │   └── Akasha.Infrastructure/
+│   └── tests/
+│       └── Akasha.ArchitectureTests/
 │
 ├── frontend/
 │   ├── app/
@@ -160,14 +166,22 @@ dotnet restore
 
 ```
 
-`dotnet restore` liest die `.csproj`-Datei und lädt alle dort definierten NuGet-Pakete.
+`dotnet restore` liest die `.csproj`-Dateien und lädt alle dort definierten NuGet-Pakete.
+
+Build und Tests:
+
+```bash
+dotnet build
+dotnet test
+
+```
 
 ----------
 
 ## Backend starten
 
 ```bash
-dotnet run
+dotnet run --project src/Akasha.Api
 
 ```
 
@@ -177,9 +191,13 @@ Für eine explizite Einrichtung empfiehlt sich trotzdem:
 
 ```bash
 dotnet restore
-dotnet run
+dotnet run --project src/Akasha.Api
 
 ```
+
+Unter `http://localhost:5257/health` steht ein Health-Endpoint zur Verfügung.
+
+----------
 
 ----------
 
@@ -591,8 +609,9 @@ Terminal 1:
 cd akasha-dms/backend
 
 dotnet restore
-dotnet run
-
+dotnet build
+dotnet test
+dotnet run --project src/Akasha.Api
 ```
 
 ## Frontend
@@ -629,7 +648,7 @@ http://localhost:5173/
 | Pakete anzeigen | `dotnet list package` |
 | Veraltete Pakete anzeigen | `dotnet list package --outdated` |
 | Paket entfernen | `dotnet remove package NAME` |
-| Backend starten | `dotnet run` |
+| Backend starten | `dotnet run --project src/Akasha.Api` |
 
 ## npm
 
@@ -689,7 +708,7 @@ dotnet build
 Danach:
 
 ```bash
-dotnet run
+dotnet run --project src/Akasha.Api
 
 ```
 
