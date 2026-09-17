@@ -4,6 +4,14 @@ GET {{Akasha_Api_HostAddress}}/health
 
 ###
 
+GET {{Akasha_Api_HostAddress}}/api/v1/system/ping
+
+###
+
+GET {{Akasha_Api_HostAddress}}/api/v1/system/fail
+
+###
+
 GET {{Akasha_Api_HostAddress}}/openapi/v1.json
 Accept: application/json
 
