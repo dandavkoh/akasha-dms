@@ -1,12 +1,16 @@
 using Akasha.Api.Middleware;
+using Akasha.Infrastructure;
+using Akasha.Infrastructure.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
-var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+builder.Services.AddInfrastructure(builder.Configuration);
+
+var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
 
 builder.Services.AddControllers();
 builder.Services.AddCors(options => options.AddPolicy("Default", policy =>
-    policy.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));
+    policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddOpenApi();
 builder.Services.AddHealthChecks();
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>

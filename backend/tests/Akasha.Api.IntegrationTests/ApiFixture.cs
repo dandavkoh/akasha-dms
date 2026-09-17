@@ -9,5 +9,6 @@ public sealed class ApiFixture : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
         builder.UseSetting("Cors:AllowedOrigins:0", "http://localhost:5173");
+        builder.UseSetting("Database:ConnectionString", "Host=localhost;Database=akasha_test;Username=postgres");
     }
 }
