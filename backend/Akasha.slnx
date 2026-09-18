@@ -8,5 +8,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/Akasha.Api.IntegrationTests/Akasha.Api.IntegrationTests.csproj" />
     <Project Path="tests/Akasha.ArchitectureTests/Akasha.ArchitectureTests.csproj" />
+    <Project Path="tests/Akasha.Infrastructure.Tests/Akasha.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>

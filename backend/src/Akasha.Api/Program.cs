@@ -1,6 +1,7 @@
 using Akasha.Api.Middleware;
 using Akasha.Infrastructure;
 using Akasha.Infrastructure.Configuration;
+using Akasha.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,6 +23,11 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 });
 
 var app = builder.Build();
+
+if (app.Configuration.GetValue("Database:MigrateOnStartup", false))
+{
+    await app.Services.MigrateAkashaDatabaseAsync();
+}
 
 app.UseMiddleware<CorrelationIdMiddleware>();
 

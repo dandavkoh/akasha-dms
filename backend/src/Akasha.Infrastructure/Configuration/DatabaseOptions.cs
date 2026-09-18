@@ -16,4 +16,10 @@ public sealed class DatabaseOptions
 
     [Range(1, 300)]
     public int CommandTimeoutSeconds { get; set; } = 30;
+
+    /// <summary>
+    /// Applies pending EF Core migrations on startup. Migrations are idempotent
+    /// and ship with the application, so this also works offline.
+    /// </summary>
+    public bool MigrateOnStartup { get; set; } = true;
 }

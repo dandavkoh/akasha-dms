@@ -1,4 +1,5 @@
 using Akasha.Infrastructure.Configuration;
+using Akasha.Infrastructure.Persistence;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -18,6 +19,13 @@ public static class DependencyInjection
         services.AddOptions<CorsOptions>()
             .Bind(configuration.GetSection(CorsOptions.SectionName))
             .ValidateOnStart();
+
+        var databaseOptions = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
+            ?? new DatabaseOptions();
+
+        services.AddDbContext<AkashaDbContext>(options => options.UseAkashaNpgsql(
+            databaseOptions.ConnectionString,
+            databaseOptions.CommandTimeoutSeconds));
 
         return services;
     }
