@@ -9,6 +9,7 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
 
+builder.Services.AddAuthentication();
 builder.Services.AddControllers();
 builder.Services.AddCors(options => options.AddPolicy("Default", policy =>
     policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));

@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Akasha.Application.Tenancy;
 using Akasha.Domain.Audit;
 using Akasha.Domain.Common;
+using Akasha.Domain.Identity;
 using Akasha.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,9 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
 
     public DbSet<Tenant> Tenants => Set<Tenant>();
 
-    public DbSet<TenantMembership> TenantMemberships => Set<TenantMembership>();
+    public DbSet<User> Users => Set<User>();
+
+    public DbSet<UserIdentity> UserIdentities => Set<UserIdentity>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 

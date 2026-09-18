@@ -19,6 +19,7 @@ public sealed class TestAuthHandler(
     public const string SchemeName = "Test";
     public const string SubjectHeader = "X-Test-Subject";
     public const string TenantHeader = "X-Test-Tenant";
+    public const string ClientHeader = "X-Test-Client";
 
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
@@ -31,6 +32,11 @@ public sealed class TestAuthHandler(
         if (Request.Headers.TryGetValue(TenantHeader, out var tenant))
         {
             claims.Add(new Claim("tenant_id", tenant.ToString()));
+        }
+
+        if (Request.Headers.TryGetValue(ClientHeader, out var client))
+        {
+            claims.Add(new Claim("client_id", client.ToString()));
         }
 
         var identity = new ClaimsIdentity(claims, SchemeName);

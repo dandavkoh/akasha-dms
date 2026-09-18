@@ -1,5 +1,3 @@
-using System.Security.Claims;
-
 namespace Akasha.Application.Tenancy;
 
 public enum TenantResolutionFailure
@@ -59,15 +57,6 @@ public interface ITenantContext
 
     /// <summary>Returns the tenant id or throws <see cref="MissingTenantContextException"/>.</summary>
     Guid Require();
-}
-
-/// <summary>
-/// Resolves the tenant for an authenticated principal by validating it against
-/// server-side tenant memberships.
-/// </summary>
-public interface ITenantResolver
-{
-    Task<Guid> ResolveTenantIdAsync(ClaimsPrincipal principal, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Default ambient tenant context implementation (scoped per request/job).</summary>

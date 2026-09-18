@@ -1,5 +1,6 @@
 using Akasha.Application.Tenancy;
 using Akasha.Domain.Audit;
+using Akasha.Domain.Identity;
 using Akasha.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,14 +44,14 @@ public sealed class TenantIsolationTests(PostgresFixture postgres)
         await using (var context = postgres.CreateContext(tenantA.Id))
         {
             context.AuditEntries.Add(new AuditEntry(tenantA.Id, "secret-action"));
-            context.TenantMemberships.Add(new TenantMembership(tenantA.Id, "subject-a"));
+            context.Users.Add(new User(tenantA.Id, "User A"));
             await context.SaveChangesAsync();
         }
 
         await using (var context = postgres.CreateContext(tenantB.Id))
         {
             Assert.Empty(await context.AuditEntries.ToListAsync());
-            Assert.Empty(await context.TenantMemberships.ToListAsync());
+            Assert.Empty(await context.Users.ToListAsync());
         }
     }
 
@@ -60,17 +61,17 @@ public sealed class TenantIsolationTests(PostgresFixture postgres)
         var tenantA = await SeedTenantAsync("a-update");
         var tenantB = await SeedTenantAsync("b-update");
 
-        var membership = new TenantMembership(tenantA.Id, "victim-subject");
+        var user = new User(tenantA.Id, "Victim User");
         await using (var context = postgres.CreateContext(tenantA.Id))
         {
-            context.TenantMemberships.Add(membership);
+            context.Users.Add(user);
             await context.SaveChangesAsync();
         }
 
         // Simulates code that attached an entity of a foreign tenant without going
         // through the filtered query path.
         await using var foreign = postgres.CreateContext(tenantB.Id);
-        foreign.TenantMemberships.Update(new TenantMembership(tenantA.Id, "forged-write"));
+        foreign.Users.Update(new User(tenantA.Id, "Forged Write"));
 
         await Assert.ThrowsAsync<TenantIsolationViolationException>(() => foreign.SaveChangesAsync());
     }
@@ -81,21 +82,21 @@ public sealed class TenantIsolationTests(PostgresFixture postgres)
         var tenantA = await SeedTenantAsync("a-delete");
         var tenantB = await SeedTenantAsync("b-delete");
 
-        var membership = new TenantMembership(tenantA.Id, "victim-subject");
+        var user = new User(tenantA.Id, "Victim User");
         await using (var context = postgres.CreateContext(tenantA.Id))
         {
-            context.TenantMemberships.Add(membership);
+            context.Users.Add(user);
             await context.SaveChangesAsync();
         }
 
         await using var foreign = postgres.CreateContext(tenantB.Id);
-        foreign.TenantMemberships.Remove(membership);
+        foreign.Users.Remove(user);
 
         await Assert.ThrowsAsync<TenantIsolationViolationException>(() => foreign.SaveChangesAsync());
 
         await using (var context = postgres.CreateContext(tenantA.Id))
         {
-            Assert.True(await context.TenantMemberships.AnyAsync());
+            Assert.True(await context.Users.AnyAsync());
         }
     }
 
@@ -112,7 +113,7 @@ public sealed class TenantIsolationTests(PostgresFixture postgres)
 
         await using var unscoped = postgres.CreateContext();
         Assert.Empty(await unscoped.AuditEntries.ToListAsync());
-        Assert.Empty(await unscoped.TenantMemberships.ToListAsync());
+        Assert.Empty(await unscoped.Users.ToListAsync());
     }
 
     [Fact]

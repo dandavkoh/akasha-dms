@@ -1,10 +1,13 @@
+using Akasha.Application.Identity;
 using Akasha.Application.Tenancy;
 using Akasha.Application.Tenants;
 using Akasha.Infrastructure.Configuration;
+using Akasha.Infrastructure.Identity;
 using Akasha.Infrastructure.Persistence;
 using Akasha.Infrastructure.Tenancy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Akasha.Infrastructure;
 
@@ -27,8 +30,11 @@ public static class DependencyInjection
             ?? new DatabaseOptions();
 
         services.AddScoped<ITenantContext, TenantContext>();
-        services.AddScoped<ITenantResolver, TenantResolver>();
+        services.AddScoped<ICurrentUser, CurrentUserContext>();
+        services.AddScoped<IIdentityResolver, IdentityResolver>();
         services.AddScoped<ITenantQueries, TenantQueries>();
+        // Additional identity providers (Entra, OIDC, SAML, LDAP...) register alongside this fallback.
+        services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityProvider, InternalIdentityProvider>());
 
         services.AddDbContext<AkashaDbContext>(options => options.UseAkashaNpgsql(
             databaseOptions.ConnectionString,

@@ -57,6 +57,99 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Identity.User", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("display_name");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("kind");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_users");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_users_tenant_id");
+
+                    b.ToTable("users", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Identity.UserIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("ExternalSubject")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("external_subject");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("provider");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_user_identities");
+
+                    b.HasIndex("TenantId")
+                        .HasDatabaseName("ix_user_identities_tenant_id");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_user_identities_user_id");
+
+                    b.HasIndex("Provider", "ExternalSubject", "UserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_user_identities_provider_external_subject_user_id");
+
+                    b.ToTable("user_identities", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Tenants.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -96,40 +189,6 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("tenants", (string)null);
                 });
 
-            modelBuilder.Entity("Akasha.Domain.Tenants.TenantMembership", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at_utc");
-
-                    b.Property<string>("Subject")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)")
-                        .HasColumnName("subject");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid")
-                        .HasColumnName("tenant_id");
-
-                    b.HasKey("Id")
-                        .HasName("pk_tenant_memberships");
-
-                    b.HasIndex("Subject")
-                        .HasDatabaseName("ix_tenant_memberships_subject");
-
-                    b.HasIndex("TenantId", "Subject")
-                        .IsUnique()
-                        .HasDatabaseName("ix_tenant_memberships_tenant_id_subject");
-
-                    b.ToTable("tenant_memberships", (string)null);
-                });
-
             modelBuilder.Entity("Akasha.Domain.Audit.AuditEntry", b =>
                 {
                     b.HasOne("Akasha.Domain.Tenants.Tenant", null)
@@ -140,14 +199,31 @@ namespace Akasha.Infrastructure.Migrations
                         .HasConstraintName("fk_audit_entries_tenants_tenant_id");
                 });
 
-            modelBuilder.Entity("Akasha.Domain.Tenants.TenantMembership", b =>
+            modelBuilder.Entity("Akasha.Domain.Identity.User", b =>
                 {
                     b.HasOne("Akasha.Domain.Tenants.Tenant", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
-                        .HasConstraintName("fk_tenant_memberships_tenants_tenant_id");
+                        .HasConstraintName("fk_users_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Identity.UserIdentity", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identities_tenants_tenant_id");
+
+                    b.HasOne("Akasha.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_user_identities_users_user_id");
                 });
 #pragma warning restore 612, 618
         }
