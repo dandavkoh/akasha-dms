@@ -1,3 +1,4 @@
+using Akasha.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
@@ -18,6 +19,19 @@ internal sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<A
                 30)
             .Options;
 
-        return new AkashaDbContext(options);
+        return new AkashaDbContext(options, new DesignTimeTenantContext());
+    }
+
+    /// <summary>Migration tooling never executes queries, so a never-established context is safe here.</summary>
+    private sealed class DesignTimeTenantContext : ITenantContext
+    {
+        public bool HasTenant => false;
+
+        public Guid TenantId => Guid.Empty;
+
+        public void Establish(Guid tenantId)
+            => throw new NotSupportedException("Design-time context cannot establish a tenant.");
+
+        public Guid Require() => throw new NotSupportedException("Design-time context has no tenant.");
     }
 }

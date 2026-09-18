@@ -63,7 +63,7 @@ public sealed class ConfigurationTests(ApiFixture factory) : IClassFixture<ApiFi
     {
         var options = factory.Services.GetRequiredService<IOptions<DatabaseOptions>>().Value;
 
-        Assert.Equal("Host=localhost;Database=akasha_test;Username=postgres", options.ConnectionString);
+        Assert.Equal(factory.ConnectionString, options.ConnectionString);
     }
 
     [Fact]

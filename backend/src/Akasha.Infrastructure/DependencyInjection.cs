@@ -1,5 +1,8 @@
+using Akasha.Application.Tenancy;
+using Akasha.Application.Tenants;
 using Akasha.Infrastructure.Configuration;
 using Akasha.Infrastructure.Persistence;
+using Akasha.Infrastructure.Tenancy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -22,6 +25,10 @@ public static class DependencyInjection
 
         var databaseOptions = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
             ?? new DatabaseOptions();
+
+        services.AddScoped<ITenantContext, TenantContext>();
+        services.AddScoped<ITenantResolver, TenantResolver>();
+        services.AddScoped<ITenantQueries, TenantQueries>();
 
         services.AddDbContext<AkashaDbContext>(options => options.UseAkashaNpgsql(
             databaseOptions.ConnectionString,

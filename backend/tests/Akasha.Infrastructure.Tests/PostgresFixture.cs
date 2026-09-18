@@ -1,3 +1,4 @@
+using Akasha.Application.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Akasha.Infrastructure.Persistence;
 using Testcontainers.PostgreSql;
@@ -24,10 +25,20 @@ public sealed class PostgresFixture : IAsyncLifetime
 
     public Task DisposeAsync() => _container.DisposeAsync().AsTask();
 
-    public AkashaDbContext CreateContext()
-        => new(new DbContextOptionsBuilder<AkashaDbContext>()
-            .UseAkashaNpgsql(ConnectionString, 30)
-            .Options);
+    public AkashaDbContext CreateContext(Guid? tenantId = null)
+    {
+        var tenantContext = new TenantContext();
+        if (tenantId is { } tenant)
+        {
+            tenantContext.Establish(tenant);
+        }
+
+        return new AkashaDbContext(
+            new DbContextOptionsBuilder<AkashaDbContext>()
+                .UseAkashaNpgsql(ConnectionString, 30)
+                .Options,
+            tenantContext);
+    }
 }
 
 [CollectionDefinition(Name)]

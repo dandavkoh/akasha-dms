@@ -45,7 +45,9 @@ app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseHttpsRedirection();
 app.UseCors("Default");
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<TenantResolutionMiddleware>();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
