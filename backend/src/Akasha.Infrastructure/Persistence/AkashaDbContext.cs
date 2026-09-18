@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Akasha.Application.Tenancy;
 using Akasha.Domain.Audit;
+using Akasha.Domain.Authorization;
 using Akasha.Domain.Common;
 using Akasha.Domain.Identity;
 using Akasha.Domain.Tenants;
@@ -28,6 +29,16 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
     public DbSet<UserIdentity> UserIdentities => Set<UserIdentity>();
 
     public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    public DbSet<Role> Roles => Set<Role>();
+
+    public DbSet<Group> Groups => Set<Group>();
+
+    public DbSet<GroupMember> GroupMembers => Set<GroupMember>();
+
+    public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
+
+    public DbSet<PermissionGrant> PermissionGrants => Set<PermissionGrant>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

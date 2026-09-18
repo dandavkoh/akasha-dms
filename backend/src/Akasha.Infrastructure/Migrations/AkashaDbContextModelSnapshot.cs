@@ -57,6 +57,166 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("audit_entries", (string)null);
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Authorization.Group", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_groups");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_groups_tenant_id_name");
+
+                    b.ToTable("groups", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.GroupMember", b =>
+                {
+                    b.Property<Guid>("GroupId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("group_id");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("GroupId", "UserId")
+                        .HasName("pk_group_members");
+
+                    b.HasIndex("UserId")
+                        .HasDatabaseName("ix_group_members_user_id");
+
+                    b.HasIndex("TenantId", "UserId")
+                        .HasDatabaseName("ix_group_members_tenant_id_user_id");
+
+                    b.ToTable("group_members", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.PermissionGrant", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("action");
+
+                    b.Property<string>("Effect")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("effect");
+
+                    b.Property<Guid>("PrincipalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("principal_id");
+
+                    b.Property<string>("PrincipalType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("principal_type");
+
+                    b.Property<Guid?>("ResourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("resource_id");
+
+                    b.Property<string>("ResourceType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("resource_type");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_permission_grants");
+
+                    b.HasIndex("TenantId", "ResourceType", "ResourceId", "Action")
+                        .HasDatabaseName("ix_permission_grants_tenant_id_resource_type_resource_id_action");
+
+                    b.ToTable("permission_grants", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.Role", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_roles");
+
+                    b.HasIndex("TenantId", "Name")
+                        .IsUnique()
+                        .HasDatabaseName("ix_roles_tenant_id_name");
+
+                    b.ToTable("roles", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.RoleAssignment", b =>
+                {
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("role_id");
+
+                    b.Property<string>("PrincipalType")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("principal_type");
+
+                    b.Property<Guid>("PrincipalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("principal_id");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("RoleId", "PrincipalType", "PrincipalId")
+                        .HasName("pk_role_assignments");
+
+                    b.HasIndex("TenantId", "PrincipalType", "PrincipalId")
+                        .HasDatabaseName("ix_role_assignments_tenant_id_principal_type_principal_id");
+
+                    b.ToTable("role_assignments", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -197,6 +357,77 @@ namespace Akasha.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_audit_entries_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.Group", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_groups_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.GroupMember", b =>
+                {
+                    b.HasOne("Akasha.Domain.Authorization.Group", null)
+                        .WithMany()
+                        .HasForeignKey("GroupId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_members_groups_group_id");
+
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_members_tenants_tenant_id");
+
+                    b.HasOne("Akasha.Domain.Identity.User", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_group_members_users_user_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.PermissionGrant", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_permission_grants_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.Role", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_roles_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Authorization.RoleAssignment", b =>
+                {
+                    b.HasOne("Akasha.Domain.Authorization.Role", null)
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_roles_role_id");
+
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_role_assignments_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Akasha.Domain.Identity.User", b =>

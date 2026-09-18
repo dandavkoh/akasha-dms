@@ -1,6 +1,8 @@
 using Akasha.Application.Identity;
+using Akasha.Application.Authorization;
 using Akasha.Application.Tenancy;
 using Akasha.Application.Tenants;
+using Akasha.Infrastructure.Authorization;
 using Akasha.Infrastructure.Configuration;
 using Akasha.Infrastructure.Identity;
 using Akasha.Infrastructure.Persistence;
@@ -32,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ICurrentUser, CurrentUserContext>();
         services.AddScoped<IIdentityResolver, IdentityResolver>();
+        services.AddScoped<IAuthorizationService, AuthorizationService>();
         services.AddScoped<ITenantQueries, TenantQueries>();
         // Additional identity providers (Entra, OIDC, SAML, LDAP...) register alongside this fallback.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityProvider, InternalIdentityProvider>());
