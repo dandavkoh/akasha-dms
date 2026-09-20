@@ -3,7 +3,9 @@ using Akasha.Application.Tenancy;
 using Akasha.Domain.Audit;
 using Akasha.Domain.Authorization;
 using Akasha.Domain.Common;
+using Akasha.Domain.Documents;
 using Akasha.Domain.Identity;
+using Akasha.Domain.Storage;
 using Akasha.Domain.Tenants;
 using Microsoft.EntityFrameworkCore;
 
@@ -39,6 +41,10 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
     public DbSet<RoleAssignment> RoleAssignments => Set<RoleAssignment>();
 
     public DbSet<PermissionGrant> PermissionGrants => Set<PermissionGrant>();
+
+    public DbSet<Document> Documents => Set<Document>();
+
+    public DbSet<StorageReference> StorageReferences => Set<StorageReference>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

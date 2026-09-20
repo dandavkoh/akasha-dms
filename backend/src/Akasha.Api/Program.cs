@@ -10,7 +10,9 @@ builder.Services.AddInfrastructure(builder.Configuration);
 var corsOptions = builder.Configuration.GetSection(CorsOptions.SectionName).Get<CorsOptions>() ?? new CorsOptions();
 
 builder.Services.AddAuthentication();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddCors(options => options.AddPolicy("Default", policy =>
     policy.WithOrigins(corsOptions.AllowedOrigins).AllowAnyHeader().AllowAnyMethod()));
 builder.Services.AddOpenApi();
@@ -22,6 +24,7 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
         context.ProblemDetails.Extensions["correlationId"] = correlationId;
     }
 });
+builder.Services.AddExceptionHandler<ProblemExceptionHandler>();
 
 var app = builder.Build();
 

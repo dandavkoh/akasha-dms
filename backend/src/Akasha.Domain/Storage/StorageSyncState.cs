@@ -17,6 +17,8 @@ public enum StorageSyncState
     Unavailable = 3,
     /// <summary>Synchronization failed; needs retry or administrative attention.</summary>
     SyncError = 4,
+    /// <summary>The whole connector is unreachable; documents keep their known state (distinct from a missing object).</summary>
+    ConnectorUnavailable = 6,
     /// <summary>Connector credentials expired; not a document problem.</summary>
     AuthenticationRequired = 5,
 }

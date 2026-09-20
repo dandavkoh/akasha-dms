@@ -217,6 +217,52 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("role_assignments", (string)null);
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Documents.Document", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Processing")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("processing");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_documents");
+
+                    b.HasIndex("TenantId", "Name")
+                        .HasDatabaseName("ix_documents_tenant_id_name");
+
+                    b.ToTable("documents", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Identity.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -308,6 +354,83 @@ namespace Akasha.Infrastructure.Migrations
                         .HasDatabaseName("ix_user_identities_provider_external_subject_user_id");
 
                     b.ToTable("user_identities", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Storage.StorageReference", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connector_id");
+
+                    b.Property<Guid?>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<string>("ETag")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("e_tag");
+
+                    b.Property<string>("ExternalId")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("external_id");
+
+                    b.Property<DateTimeOffset?>("LastKnownModifiedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_known_modified_at_utc");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Path")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)")
+                        .HasColumnName("path");
+
+                    b.Property<string>("SyncState")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("sync_state");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Version")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasColumnName("version");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_storage_references");
+
+                    b.HasIndex("DocumentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storage_references_document_id");
+
+                    b.HasIndex("TenantId", "ConnectorId", "ExternalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_storage_references_tenant_id_connector_id_external_id");
+
+                    b.ToTable("storage_references", (string)null);
                 });
 
             modelBuilder.Entity("Akasha.Domain.Tenants.Tenant", b =>
@@ -430,6 +553,16 @@ namespace Akasha.Infrastructure.Migrations
                         .HasConstraintName("fk_role_assignments_tenants_tenant_id");
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Documents.Document", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_documents_tenants_tenant_id");
+                });
+
             modelBuilder.Entity("Akasha.Domain.Identity.User", b =>
                 {
                     b.HasOne("Akasha.Domain.Tenants.Tenant", null)
@@ -455,6 +588,28 @@ namespace Akasha.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_identities_users_user_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Storage.StorageReference", b =>
+                {
+                    b.HasOne("Akasha.Domain.Documents.Document", null)
+                        .WithOne("Storage")
+                        .HasForeignKey("Akasha.Domain.Storage.StorageReference", "DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasConstraintName("fk_storage_references_documents_document_id");
+
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_storage_references_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Documents.Document", b =>
+                {
+                    b.Navigation("Storage")
+                        .IsRequired();
                 });
 #pragma warning restore 612, 618
         }

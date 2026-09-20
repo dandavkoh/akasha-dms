@@ -1,3 +1,5 @@
+using Akasha.Domain.Common;
+
 namespace Akasha.Domain.Storage;
 
 /// <summary>
@@ -6,7 +8,7 @@ namespace Akasha.Domain.Storage;
 /// path and name change on external rename/move, the stable identity is
 /// (ConnectorId, ExternalId) where the provider offers stable external IDs.
 /// </summary>
-public sealed class StorageReference
+public sealed class StorageReference : ITenantScoped
 {
     public const int MaxExternalIdLength = 512;
     public const int MaxPathLength = 2048;
@@ -19,6 +21,7 @@ public sealed class StorageReference
     }
 
     public StorageReference(
+        Guid tenantId,
         Guid connectorId,
         string externalId,
         string path,
@@ -27,10 +30,17 @@ public sealed class StorageReference
         string? eTag = null,
         DateTimeOffset? lastKnownModifiedAtUtc = null)
     {
+        if (tenantId == Guid.Empty)
+        {
+            throw new ArgumentException("Tenant id must not be empty.", nameof(tenantId));
+        }
+
         if (connectorId == Guid.Empty)
         {
             throw new ArgumentException("Connector id must not be empty.", nameof(connectorId));
         }
+
+        TenantId = tenantId;
 
         ExternalId = Check(externalId, MaxExternalIdLength, nameof(externalId));
         Path = Check(path, MaxPathLength, nameof(path));
@@ -43,6 +53,8 @@ public sealed class StorageReference
     }
 
     public Guid Id { get; private set; } = Guid.CreateVersion7();
+
+    public Guid TenantId { get; private set; }
 
     public Guid ConnectorId { get; private set; }
 
@@ -86,6 +98,9 @@ public sealed class StorageReference
     public void MarkUnavailable() => SyncState = StorageSyncState.Unavailable;
 
     public void MarkSyncError() => SyncState = StorageSyncState.SyncError;
+
+    /// <summary>The connector itself is unreachable; the document's last known state is kept, nothing is deleted.</summary>
+    public void MarkConnectorUnavailable() => SyncState = StorageSyncState.ConnectorUnavailable;
 
     public void MarkAuthenticationRequired() => SyncState = StorageSyncState.AuthenticationRequired;
 

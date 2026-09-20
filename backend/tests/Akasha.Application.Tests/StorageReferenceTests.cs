@@ -5,7 +5,7 @@ namespace Akasha.Application.Tests;
 public sealed class StorageReferenceTests
 {
     private static StorageReference CreateReference() =>
-        new(Guid.NewGuid(), "ext-1", "/akte-1", "contract.pdf", version: "5", eTag: "etag-5",
+        new(Guid.NewGuid(), Guid.NewGuid(), "ext-1", "/akte-1", "contract.pdf", version: "5", eTag: "etag-5",
             lastKnownModifiedAtUtc: DateTimeOffset.UtcNow);
 
     [Fact]
@@ -66,10 +66,10 @@ public sealed class StorageReferenceTests
     public void Validation_Rejects_Empty_Connector_And_Blank_Identity()
     {
         Assert.Throws<ArgumentException>(() =>
-            new StorageReference(Guid.Empty, "ext", "/p", "n"));
+            new StorageReference(Guid.NewGuid(), Guid.Empty, "ext", "/p", "n"));
         Assert.Throws<ArgumentException>(() =>
-            new StorageReference(Guid.NewGuid(), "", "/p", "n"));
+            new StorageReference(Guid.NewGuid(), Guid.NewGuid(), "", "/p", "n"));
         Assert.Throws<ArgumentException>(() =>
-            new StorageReference(Guid.NewGuid(), "ext", "/p", " "));
+            new StorageReference(Guid.NewGuid(), Guid.NewGuid(), "ext", "/p", " "));
     }
 }
