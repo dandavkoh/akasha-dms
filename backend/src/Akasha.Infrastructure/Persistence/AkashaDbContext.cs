@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Akasha.Application.Tenancy;
+using Akasha.Domain.Akten;
 using Akasha.Domain.Audit;
 using Akasha.Domain.Authorization;
 using Akasha.Domain.Common;
@@ -45,6 +46,10 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
     public DbSet<Document> Documents => Set<Document>();
 
     public DbSet<StorageReference> StorageReferences => Set<StorageReference>();
+
+    public DbSet<Akte> Akten => Set<Akte>();
+
+    public DbSet<AkteDocument> AkteDocuments => Set<AkteDocument>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

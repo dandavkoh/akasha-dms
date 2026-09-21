@@ -22,6 +22,99 @@ namespace Akasha.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Akasha.Domain.Akten.Akte", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("description");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_akten");
+
+                    b.HasIndex("TenantId", "Name")
+                        .HasDatabaseName("ix_akten_tenant_id_name");
+
+                    b.ToTable("akten", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Akten.AkteDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("AkteId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("akte_id");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("document_id");
+
+                    b.Property<DateTimeOffset>("LinkedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("linked_at_utc");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_akte_documents");
+
+                    b.HasIndex("AkteId")
+                        .HasDatabaseName("ix_akte_documents_akte_id");
+
+                    b.HasIndex("DocumentId")
+                        .HasDatabaseName("ix_akte_documents_document_id");
+
+                    b.HasIndex("TenantId", "DocumentId")
+                        .HasDatabaseName("ix_akte_documents_tenant_id_document_id");
+
+                    b.HasIndex("TenantId", "AkteId", "DocumentId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_akte_documents_tenant_id_akte_id_document_id");
+
+                    b.ToTable("akte_documents", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Audit.AuditEntry", b =>
                 {
                     b.Property<Guid>("Id")
@@ -470,6 +563,40 @@ namespace Akasha.Infrastructure.Migrations
                         .HasDatabaseName("ix_tenants_slug");
 
                     b.ToTable("tenants", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Akten.Akte", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_akten_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Akten.AkteDocument", b =>
+                {
+                    b.HasOne("Akasha.Domain.Akten.Akte", null)
+                        .WithMany()
+                        .HasForeignKey("AkteId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_akte_documents_akten_akte_id");
+
+                    b.HasOne("Akasha.Domain.Documents.Document", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_akte_documents_documents_document_id");
+
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_akte_documents_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Akasha.Domain.Audit.AuditEntry", b =>
