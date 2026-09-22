@@ -1,7 +1,19 @@
 using Akasha.Application.Documents;
 using Akasha.Domain.Akten;
+using Akasha.Domain.Storage;
 
 namespace Akasha.Application.Akten;
+
+/// <summary>
+/// A document contained in an Akte. Identified by the logical DocumentId only - never by
+/// storage path. <see cref="State"/> reflects physical availability: a document stays part
+/// of the Akte even while it is Missing or its connector is unavailable (#25/#105).
+/// </summary>
+public sealed record AkteDocumentView(
+    Guid DocumentId,
+    string Name,
+    StorageSyncState State,
+    DateTimeOffset LinkedAtUtc);
 
 public sealed record AkteView(
     Guid Id,
@@ -43,4 +55,11 @@ public interface IAkteService
     Task AttachAsync(Guid akteId, Guid documentId, CancellationToken cancellationToken = default);
 
     Task DetachAsync(Guid akteId, Guid documentId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists the documents of the Akte, including ones whose physical file is currently
+    /// Missing or whose connector is unavailable - membership is logical and never depends
+    /// on physical availability.
+    /// </summary>
+    Task<PagedResult<AkteDocumentView>> ListDocumentsAsync(Guid akteId, int skip, int take, CancellationToken cancellationToken = default);
 }

@@ -172,6 +172,37 @@ public sealed class AkteService(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
+    public async Task<PagedResult<AkteDocumentView>> ListDocumentsAsync(
+        Guid akteId, int skip, int take, CancellationToken cancellationToken = default)
+    {
+        if (skip < 0 || take is < 1 or > 100)
+        {
+            throw new ValidationException("Invalid pagination: skip >= 0 and 1 <= take <= 100.");
+        }
+
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Akte, akteId, PermissionAction.Read, cancellationToken);
+
+        // Existence check with the tenant filter applied: a foreign Akte is NotFound,
+        // never a leak about its documents.
+        _ = await LoadAsync(akteId, cancellationToken);
+
+        var query =
+            from membership in dbContext.AkteDocuments.AsNoTracking()
+            where membership.AkteId == akteId
+            orderby membership.LinkedAtUtc
+            join document in dbContext.Documents.AsNoTracking()
+                on membership.DocumentId equals document.Id
+            select new { membership.DocumentId, document.Name, State = document.Storage.SyncState, membership.LinkedAtUtc };
+
+        var total = await query.CountAsync(cancellationToken);
+        var items = (await query.Skip(skip).Take(take).ToListAsync(cancellationToken))
+            .Select(row => new AkteDocumentView(row.DocumentId, row.Name, row.State, row.LinkedAtUtc))
+            .ToList();
+
+        return new PagedResult<AkteDocumentView>(items, total, skip, take);
+    }
+
     private async Task<AkteView> SetStatusAsync(Guid id, uint rowVersion, bool archive, CancellationToken cancellationToken)
     {
         if (rowVersion == 0)

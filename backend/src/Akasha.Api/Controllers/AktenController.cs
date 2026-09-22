@@ -56,6 +56,16 @@ public sealed class AktenController(IAkteService akten) : ControllerBase
     public Task<AkteView> Reactivate(Guid id, [FromBody] AkteRowVersionRequest request, CancellationToken cancellationToken)
         => akten.ReactivateAsync(id, request.RowVersion, cancellationToken);
 
+    [HttpGet("{id:guid}/documents")]
+    [ProducesResponseType(typeof(PagedResult<AkteDocumentView>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public Task<PagedResult<AkteDocumentView>> ListDocuments(
+        Guid id,
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 50,
+        CancellationToken cancellationToken = default)
+        => akten.ListDocumentsAsync(id, skip, take, cancellationToken);
+
     [HttpPut("{id:guid}/documents/{documentId:guid}")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

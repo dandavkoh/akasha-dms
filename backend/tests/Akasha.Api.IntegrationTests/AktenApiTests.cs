@@ -221,6 +221,50 @@ public sealed class AktenApiTests(ApiFixture factory) : IClassFixture<ApiFixture
     }
 
     [Fact]
+    public async Task List_documents_returns_states_and_keeps_missing_members()
+    {
+        var user = await SeedUserAsync("listdocs",
+            PermissionAction.Write, PermissionAction.Read);
+        var client = factory.CreateClient();
+
+        Guid availableId, missingId;
+        await using (var context = CreateContext(user.Tenant.Id))
+        {
+            var available = new Akasha.Domain.Documents.Document(user.Tenant.Id, new Akasha.Domain.Storage.StorageReference(
+                user.Tenant.Id, Guid.NewGuid(), "ext-ok", "/some/where", "ok.pdf"));
+            var missing = new Akasha.Domain.Documents.Document(user.Tenant.Id, new Akasha.Domain.Storage.StorageReference(
+                user.Tenant.Id, Guid.NewGuid(), "ext-missing", "/some/where", "gone.pdf"));
+            missing.MarkMissing();
+            context.Documents.Add(available);
+            context.Documents.Add(missing);
+            context.PermissionGrants.Add(new PermissionGrant(
+                user.Tenant.Id, PrincipalType.User, user.User.Id,
+                ResourceType.Document, null, PermissionAction.Read));
+            await context.SaveChangesAsync();
+            availableId = available.Id;
+            missingId = missing.Id;
+        }
+
+        var create = Request(HttpMethod.Post, Base, user.Id);
+        create.Content = JsonContent.Create(new { name = "Akte" });
+        var id = Body(await client.SendAsync(create)).GetProperty("id").GetGuid();
+        foreach (var documentId in new[] { availableId, missingId })
+        {
+            Assert.Equal(HttpStatusCode.NoContent,
+                (await client.SendAsync(Request(HttpMethod.Put, $"{Base}/{id}/documents/{documentId}", user.Id))).StatusCode);
+        }
+
+        var documents = Body(await client.SendAsync(Request(HttpMethod.Get, $"{Base}/{id}/documents", user.Id)));
+        Assert.Equal(2, documents.GetProperty("total").GetInt32());
+        var states = documents.GetProperty("items").EnumerateArray()
+            .ToDictionary(item => item.GetProperty("documentId").GetGuid(), item => item.GetProperty("state").GetString());
+        Assert.Equal("Pending", states[availableId]);
+        Assert.Equal("Missing", states[missingId]);
+
+        Assert.Equal(HttpStatusCode.NotFound,
+            (await client.SendAsync(Request(HttpMethod.Get, $"{Base}/{Guid.NewGuid()}/documents", user.Id))).StatusCode);
+    }
+    [Fact]
     public async Task Validation_errors_are_bad_request()
     {
         var user = await SeedUserAsync("bad", PermissionAction.Write, PermissionAction.Read);

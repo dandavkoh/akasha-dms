@@ -68,10 +68,11 @@ public sealed class AkteServiceTests(PostgresFixture postgres)
         }
 
         /// <summary>Seeds a logical document directly; attachment needs an existing DocumentId.</summary>
-        public async Task<Guid> SeedDocumentAsync(string externalId)
+        public async Task<Guid> SeedDocumentAsync(string externalId, Action<Document>? mutate = null)
         {
             var document = new Document(Tenant.Id, new StorageReference(
                 Tenant.Id, Guid.NewGuid(), externalId, "/somewhere", $"{externalId}.pdf"));
+            mutate?.Invoke(document);
             Db.Documents.Add(document);
             await Db.SaveChangesAsync();
             return document.Id;
@@ -272,5 +273,106 @@ public sealed class AkteServiceTests(PostgresFixture postgres)
         var fetched = await context.Service.GetAsync(akte.Id);
         Assert.Empty(fetched.DocumentIds);
         Assert.Equal(AkteStatus.Active, fetched.Status); // the Akte itself is unaffected
+    }
+
+    private async Task GrantDocumentRead(Context context)
+    {
+        context.Db.PermissionGrants.Add(new PermissionGrant(
+            context.Tenant.Id, PrincipalType.User, context.User.Id,
+            ResourceType.Document, null, PermissionAction.Read));
+        await context.Db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task One_Document_Can_Belong_To_Multiple_Akten()
+    {
+        using var context = await Context.CreateAsync(postgres, "many", PermissionAction.Write, PermissionAction.Read);
+        var akteA = await context.Service.CreateAsync(Request("Akte A"));
+        var akteB = await context.Service.CreateAsync(Request("Akte B"));
+        var documentId = await context.SeedDocumentAsync("shared");
+        await GrantDocumentRead(context);
+
+        // cardinality decision: many-to-many - one logical document, many Akten (#10 root)
+        await context.Service.AttachAsync(akteA.Id, documentId);
+        await context.Service.AttachAsync(akteB.Id, documentId);
+
+        Assert.Equal([documentId], (await context.Service.GetAsync(akteA.Id)).DocumentIds);
+        Assert.Equal([documentId], (await context.Service.GetAsync(akteB.Id)).DocumentIds);
+    }
+
+    [Fact]
+    public async Task ListDocuments_Paginates_And_Requires_Read_And_Tenant_Match()
+    {
+        using var context = await Context.CreateAsync(postgres, "ldocs", PermissionAction.Write, PermissionAction.Read);
+        var akte = await context.Service.CreateAsync(Request());
+        await GrantDocumentRead(context);
+
+        for (var index = 0; index < 3; index++)
+        {
+            var documentId = await context.SeedDocumentAsync($"d{index}");
+            await context.Service.AttachAsync(akte.Id, documentId);
+        }
+
+        var page1 = await context.Service.ListDocumentsAsync(akte.Id, 0, 2);
+        var page2 = await context.Service.ListDocumentsAsync(akte.Id, 2, 2);
+        Assert.Equal(3, page1.Total);
+        Assert.Equal(2, page1.Items.Count);
+        Assert.Single(page2.Items);
+        Assert.Equal("d0.pdf", page1.Items[0].Name);
+        Assert.Equal(StorageSyncState.Pending, page1.Items[0].State); // distinct from LinkedAtUtc ordering
+
+        await Assert.ThrowsAsync<ValidationException>(() => context.Service.ListDocumentsAsync(akte.Id, -1, 10));
+        await Assert.ThrowsAsync<ValidationException>(() => context.Service.ListDocumentsAsync(akte.Id, 0, 101));
+        await Assert.ThrowsAsync<NotFoundException>(() => context.Service.ListDocumentsAsync(Guid.NewGuid(), 0, 10));
+
+        using var noGrant = await Context.CreateAsync(postgres, "ldocs-denied");
+        await Assert.ThrowsAsync<AccessDeniedException>(() => noGrant.Service.ListDocumentsAsync(akte.Id, 0, 10));
+    }
+
+    [Fact]
+    public async Task ListDocuments_Keeps_Missing_And_ConnectorUnavailable_Documents_Visible()
+    {
+        using var context = await Context.CreateAsync(postgres, "ldocs-missing",
+            PermissionAction.Write, PermissionAction.Read);
+        var akte = await context.Service.CreateAsync(Request());
+        await GrantDocumentRead(context);
+
+        var availableId = await context.SeedDocumentAsync("ok");
+        var missingId = await context.SeedDocumentAsync("gone", document => document.MarkMissing());
+        var connectorDownId = await context.SeedDocumentAsync("conn", document => document.MarkConnectorUnavailable());
+
+        await context.Service.AttachAsync(akte.Id, availableId);
+        await context.Service.AttachAsync(akte.Id, missingId);
+        await context.Service.AttachAsync(akte.Id, connectorDownId);
+
+        // #25/#105: a missing file or an unreachable connector never removes the logical
+        // membership - the Akte view surfaces the availability state instead
+        var list = await context.Service.ListDocumentsAsync(akte.Id, 0, 10);
+        Assert.Equal(3, list.Total);
+        Assert.Equal(
+            new Dictionary<Guid, StorageSyncState>
+            {
+                [availableId] = StorageSyncState.Pending,
+                [missingId] = StorageSyncState.Missing,
+                [connectorDownId] = StorageSyncState.ConnectorUnavailable,
+            },
+            list.Items.ToDictionary(item => item.DocumentId, item => item.State));
+    }
+
+    [Fact]
+    public async Task Attach_Allows_A_Document_Whose_Physical_File_Is_Missing()
+    {
+        using var context = await Context.CreateAsync(postgres, "attach-missing",
+            PermissionAction.Write, PermissionAction.Read);
+        var akte = await context.Service.CreateAsync(Request());
+        var missingId = await context.SeedDocumentAsync("missing", document => document.MarkMissing());
+        await GrantDocumentRead(context);
+
+        // logical existence is what matters; a missing physical file must not block linking
+        await context.Service.AttachAsync(akte.Id, missingId);
+
+        var list = await context.Service.ListDocumentsAsync(akte.Id, 0, 10);
+        Assert.Single(list.Items);
+        Assert.Equal(StorageSyncState.Missing, list.Items[0].State);
     }
 }
