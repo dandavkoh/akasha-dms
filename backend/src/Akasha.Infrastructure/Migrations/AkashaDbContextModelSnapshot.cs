@@ -449,6 +449,40 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("user_identities", (string)null);
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Storage.ConnectorSyncCheckpoint", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ConnectorId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("connector_id");
+
+                    b.Property<string>("Cursor")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)")
+                        .HasColumnName("cursor");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_connector_sync_checkpoints");
+
+                    b.HasIndex("TenantId", "ConnectorId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_connector_sync_checkpoints_tenant_id_connector_id");
+
+                    b.ToTable("connector_sync_checkpoints", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Storage.StorageReference", b =>
                 {
                     b.Property<Guid>("Id")
@@ -715,6 +749,16 @@ namespace Akasha.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_identities_users_user_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Storage.ConnectorSyncCheckpoint", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_connector_sync_checkpoints_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Akasha.Domain.Storage.StorageReference", b =>

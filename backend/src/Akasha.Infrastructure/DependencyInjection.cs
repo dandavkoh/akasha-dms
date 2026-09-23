@@ -47,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<ITenantQueries, TenantQueries>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<IAkteService, AkteService>();
+        services.AddScoped<Akasha.Application.Storage.IStorageSyncService,
+            Akasha.Infrastructure.Storage.StorageSyncService>();
         // Additional identity providers (Entra, OIDC, SAML, LDAP...) register alongside this fallback.
         services.TryAddEnumerable(ServiceDescriptor.Scoped<IIdentityProvider, InternalIdentityProvider>());
 

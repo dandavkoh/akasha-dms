@@ -47,6 +47,8 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
 
     public DbSet<StorageReference> StorageReferences => Set<StorageReference>();
 
+    public DbSet<ConnectorSyncCheckpoint> ConnectorSyncCheckpoints => Set<ConnectorSyncCheckpoint>();
+
     public DbSet<Akte> Akten => Set<Akte>();
 
     public DbSet<AkteDocument> AkteDocuments => Set<AkteDocument>();
