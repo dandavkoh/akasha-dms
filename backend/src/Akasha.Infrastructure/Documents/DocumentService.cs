@@ -6,6 +6,7 @@ using Akasha.Application.Tenancy;
 using Akasha.Domain.Audit;
 using Akasha.Domain.Authorization;
 using Akasha.Domain.Documents;
+using Akasha.Application.Storage;
 using Akasha.Domain.Storage;
 using Akasha.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,7 +24,8 @@ public sealed class DocumentService(
     AkashaDbContext dbContext,
     IAuthorizationService authorization,
     ICurrentUser currentUser,
-    ITenantContext tenantContext) : IDocumentService
+    ITenantContext tenantContext,
+    IConnectorResolver connectors) : IDocumentService
 {
     public async Task<PagedResult<DocumentView>> ListAsync(int skip, int take, CancellationToken cancellationToken = default)
     {
@@ -194,6 +196,276 @@ public sealed class DocumentService(
         dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.deleted", user.Subject));
         await dbContext.SaveChangesAsync(cancellationToken);
     }
+
+    // ---------- physical file operations (connector-backed) ----------
+    // Common pipeline: authorize → load (tenant-filtered) → resolve connector (tenant-checked)
+    // → capability check → storage operation → THEN database update + audit (#29).
+    // A failed storage operation never updates the database and never reports success.
+
+    public async Task<DocumentView> UploadContentAsync(UploadDocumentRequest request, Stream content, CancellationToken cancellationToken = default)
+    {
+        Validate(nameof(request.Name), request.Name, StorageReference.MaxNameLength);
+        Validate(nameof(request.FolderPath), request.FolderPath, StorageReference.MaxPathLength);
+
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, null, PermissionAction.Upload, cancellationToken);
+
+        var connector = await connectors.ResolveAsync(request.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Write);
+
+        // Storage first (rule #118): no database transaction is held during the upload.
+        var stored = await connector.CreateDocumentAsync(request.FolderPath, request.Name, content, cancellationToken);
+
+        var tenantId = tenantContext.Require();
+        var document = new Document(tenantId, new StorageReference(
+            tenantId,
+            request.ConnectorId,
+            stored.ExternalId,
+            stored.Path,
+            stored.Name,
+            stored.Version,
+            stored.ETag,
+            stored.ModifiedAtUtc));
+
+        dbContext.Documents.Add(document);
+        dbContext.AuditEntries.Add(new AuditEntry(tenantId, "document.uploaded", user.Subject));
+        try
+        {
+            await MarkRegisteredAsync(document, stored, cancellationToken);
+        }
+        catch (ConflictException)
+        {
+            // Registration conflicted after the file was created: remove the orphan so the
+            // partial failure leaves no unreferenced physical file behind.
+            await TryDeletePhysicalAsync(connector, stored.ExternalId, cancellationToken);
+            throw;
+        }
+
+        return ViewOf(document);
+    }
+
+    public async Task<DocumentContent> DownloadContentAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // Authorization BEFORE any content access (rule #10).
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Download, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Read);
+
+        var (stream, item) = await GuardedAsync(document, async () =>
+        {
+            var opened = await connector.DownloadAsync(document.Storage.ExternalId, cancellationToken);
+            var current = await connector.GetDocumentAsync(document.Storage.ExternalId, cancellationToken);
+            return (opened, current);
+        }, cancellationToken);
+
+        dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.downloaded", user.Subject));
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        return new DocumentContent(stream, item.Name, item.ContentType, item.Size);
+    }
+
+    public async Task<DocumentView> UpdateContentAsync(Guid id, UpdateContentRequest request, Stream content, CancellationToken cancellationToken = default)
+    {
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Write, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Write);
+
+        var stored = await GuardedAsync(document, () => connector.UpdateDocumentAsync(
+            document.Storage.ExternalId, content, ETagOrKnown(document, request.ETag), cancellationToken), cancellationToken);
+
+        document.RecordExternalVersion(stored.Version, stored.ETag, stored.ModifiedAtUtc);
+        dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.updated", user.Subject));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ViewOf(document);
+    }
+
+    public async Task DeleteContentAsync(Guid id, string? eTag, CancellationToken cancellationToken = default)
+    {
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Delete, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Delete);
+
+        await GuardedAsync(document, async () =>
+        {
+            await connector.DeleteDocumentAsync(
+                document.Storage.ExternalId, ETagOrKnown(document, eTag), cancellationToken);
+            return true;
+        }, cancellationToken);
+
+        // The file is gone; the logical document, Akte relationships and history survive (#83).
+        document.MarkMissing();
+        dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.file.deleted", user.Subject));
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<DocumentView> MoveFileAsync(Guid id, MoveDocumentRequest request, CancellationToken cancellationToken = default)
+    {
+        Validate(nameof(request.TargetFolderPath), request.TargetFolderPath, StorageReference.MaxPathLength);
+
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Move, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Move);
+
+        var stored = await GuardedAsync(document, () => connector.MoveDocumentAsync(
+            document.Storage.ExternalId, request.TargetFolderPath, document.Storage.ETag, cancellationToken), cancellationToken);
+
+        // Same DocumentId, new physical location; Akte relationships are untouched (#23).
+        document.RecordExternalRelocation(stored.Path, stored.Name);
+        document.RecordExternalVersion(stored.Version, stored.ETag, stored.ModifiedAtUtc);
+        dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.moved", user.Subject));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ViewOf(document);
+    }
+
+    public async Task<DocumentView> CopyFileAsync(Guid id, CopyDocumentRequest request, CancellationToken cancellationToken = default)
+    {
+        Validate(nameof(request.TargetFolderPath), request.TargetFolderPath, StorageReference.MaxPathLength);
+
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Copy, cancellationToken);
+        // The copy becomes a new document: creating documents must also be allowed.
+        await authorization.RequireAsync(user, ResourceType.Document, null, PermissionAction.Upload, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Copy);
+
+        var stored = await GuardedAsync(document, () => connector.CopyDocumentAsync(
+            document.Storage.ExternalId, request.TargetFolderPath, request.NewName, cancellationToken), cancellationToken);
+
+        var tenantId = tenantContext.Require();
+        var copy = new Document(tenantId, new StorageReference(
+            tenantId,
+            document.Storage.ConnectorId,
+            stored.ExternalId,
+            stored.Path,
+            stored.Name,
+            stored.Version,
+            stored.ETag,
+            stored.ModifiedAtUtc));
+
+        dbContext.Documents.Add(copy);
+        dbContext.AuditEntries.Add(new AuditEntry(tenantId, "document.copied", user.Subject));
+        await MarkRegisteredAsync(copy, stored, cancellationToken);
+        return ViewOf(copy);
+    }
+
+    public async Task<DocumentView> RenameFileAsync(Guid id, RenameFileRequest request, CancellationToken cancellationToken = default)
+    {
+        Validate(nameof(request.Name), request.Name, Document.MaxNameLength);
+
+        var user = currentUser.Require();
+        await authorization.RequireAsync(user, ResourceType.Document, id, PermissionAction.Rename, cancellationToken);
+
+        var document = await LoadAsync(id, cancellationToken);
+        var connector = await connectors.ResolveAsync(document.Storage.ConnectorId, cancellationToken);
+        connector.Require(StorageCapability.Rename);
+
+        var stored = await GuardedAsync(document, () => connector.RenameDocumentAsync(
+            document.Storage.ExternalId, request.Name, ETagOrKnown(document, request.ETag), cancellationToken), cancellationToken);
+
+        // Same DocumentId, new filename; Akte relationships are untouched (#22).
+        document.RecordExternalRelocation(stored.Path, stored.Name);
+        document.RecordExternalVersion(stored.Version, stored.ETag, stored.ModifiedAtUtc);
+        dbContext.AuditEntries.Add(new AuditEntry(document.TenantId, "document.file.renamed", user.Subject));
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return ViewOf(document);
+    }
+
+    /// <summary>Optimistic concurrency token: the client's If-Match wins, otherwise the last known ETag. Never silently overwrite external changes (#9/#28).</summary>
+    private static string? ETagOrKnown(Document document, string? requested)
+        => requested ?? document.Storage.ETag;
+
+    /// <summary>
+    /// Runs a connector operation and keeps the document state honest on failure:
+    /// the operation did not succeed, so it is never reported as such, <em>and</em>
+    /// the known storage state is corrected where the failure proves it stale
+    /// (NotFound → Missing, Unavailable/lock → Unavailable, expired credentials →
+    /// AuthenticationRequired). State transitions are explicit and audited (#31,#105).
+    /// </summary>
+    private async Task<T> GuardedAsync<T>(Document document, Func<Task<T>> operation, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await operation();
+        }
+        catch (StorageException exception)
+        {
+            switch (exception.Kind)
+            {
+                case StorageErrorKind.NotFound:
+                    document.MarkMissing();
+                    break;
+                case StorageErrorKind.Unavailable:
+                    document.MarkUnavailable();
+                    break;
+                case StorageErrorKind.AuthenticationRequired:
+                    document.MarkAuthenticationRequired();
+                    break;
+                default:
+                    throw; // authorization/concurrency/validation/conflict: no state change implied
+            }
+
+            dbContext.AuditEntries.Add(new AuditEntry(
+                document.TenantId, $"document.storage.state.{document.State.ToString().ToLowerInvariant()}", currentUser.Require().Subject));
+            await dbContext.SaveChangesAsync(cancellationToken);
+            throw;
+        }
+    }
+
+    /// <summary>Persists a freshly uploaded/copied document as Available and processes the unique-key race.</summary>
+    private async Task MarkRegisteredAsync(Document document, StorageItem stored, CancellationToken cancellationToken)
+    {
+        // No staleness guard here (RecordExternalVersion ignores same-timestamp writes):
+        // this is the initial registration, the state transitions Pending → Available.
+        document.Storage.RecordVersion(stored.Version, stored.ETag, stored.ModifiedAtUtc);
+        document.Storage.MarkAvailable();
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+        {
+            throw new ConflictException(
+                "A document for this storage object (connector + external id) already exists.");
+        }
+    }
+
+    /// <summary>Best-effort physical cleanup after an aborted registration; never throws.</summary>
+    private static async Task TryDeletePhysicalAsync(IStorageConnector connector, string externalId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await connector.DeleteDocumentAsync(externalId, cancellationToken: cancellationToken);
+        }
+        catch (StorageException)
+        {
+            // cleanup is best effort; the orphaned file is reconciled by synchronization
+        }
+    }
+
+    private DocumentView ViewOf(Document document)
+        => new(
+            document.Id,
+            document.Name,
+            document.State,
+            document.Processing,
+            ToView(document.Storage),
+            Xmin(document),
+            document.CreatedAtUtc,
+            document.UpdatedAtUtc);
 
     private async Task<Document> LoadAsync(Guid id, CancellationToken cancellationToken)
         => await dbContext.Documents

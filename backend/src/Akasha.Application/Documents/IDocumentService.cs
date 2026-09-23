@@ -41,13 +41,30 @@ public sealed record CreateDocumentRequest(
 
 public sealed record RenameDocumentRequest(string Name, uint RowVersion);
 
+public sealed record UploadDocumentRequest(Guid ConnectorId, string FolderPath, string Name);
+
+public sealed record MoveDocumentRequest(string TargetFolderPath);
+
+public sealed record CopyDocumentRequest(string TargetFolderPath, string? NewName = null);
+
+/// <summary>Physical rename through the connector. <paramref name="ETag"/> overrides the known version token.</summary>
+public sealed record RenameFileRequest(string Name, string? ETag = null);
+
+/// <summary>Content replacement. <paramref name="ETag"/> (If-Match) overrides the known version token.</summary>
+public sealed record UpdateContentRequest(string? ETag = null);
+
+/// <summary>Opened document content. The caller owns and disposes <see cref="Content"/>.</summary>
+public sealed record DocumentContent(Stream Content, string FileName, string? ContentType, long Size);
+
 /// <summary>
 /// Application service for logical documents. Every operation establishes tenant context,
 /// authorizes via <c>IAuthorizationService</c> before touching data, uses PostgreSQL xmin
 /// optimistic concurrency for updates and writes audit entries for mutations.
 ///
-/// Content operations (upload/download/physical move or delete) go through the storage
-/// connector abstraction and are added once the connector registry exists.
+/// Content operations (upload/download/physical update or delete) go through the storage
+/// connector abstraction resolved per tenant; storage success always precedes any
+/// database state change (rule #29). Storage failures are never reported as success:
+/// they surface as <c>StorageException</c> with a normalized <c>StorageErrorKind</c>.
 /// </summary>
 public interface IDocumentService
 {
@@ -61,4 +78,39 @@ public interface IDocumentService
 
     /// <summary>Logical deletion only; the physical customer file is never touched here.</summary>
     Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Uploads a new file through the connector and registers the logical document
+    /// (Available on success). Storage write happens first; the database is only
+    /// updated after the storage operation succeeded.
+    /// </summary>
+    Task<DocumentView> UploadContentAsync(UploadDocumentRequest request, Stream content, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Opens the physical content for reading. Authorization (<c>Download</c>) happens
+    /// before any content access. Caller disposes the returned stream.
+    /// </summary>
+    Task<DocumentContent> DownloadContentAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Replaces the physical content. Uses the client's If-Match ETag, falling back to the
+    /// last known ETag, so concurrent external modifications produce a conflict instead of
+    /// being silently overwritten. The logical identity is preserved.
+    /// </summary>
+    Task<DocumentView> UpdateContentAsync(Guid id, UpdateContentRequest request, Stream content, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Physically deletes the file through the connector and marks the logical document
+    /// <c>Missing</c>. The logical document, Akte relationships and history survive (rule #83).
+    /// </summary>
+    Task DeleteContentAsync(Guid id, string? eTag, CancellationToken cancellationToken = default);
+
+    /// <summary>Moves the physical file and updates the storage reference. <c>DocumentId</c> and Akte relationships are untouched.</summary>
+    Task<DocumentView> MoveFileAsync(Guid id, MoveDocumentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Copies the physical file and registers the copy as a NEW logical document.</summary>
+    Task<DocumentView> CopyFileAsync(Guid id, CopyDocumentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Physically renames the file; the logical document keeps its identity and adopts the new name.</summary>
+    Task<DocumentView> RenameFileAsync(Guid id, RenameFileRequest request, CancellationToken cancellationToken = default);
 }

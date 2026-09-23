@@ -61,7 +61,8 @@ public sealed class DocumentServiceTests(PostgresFixture postgres)
                 Tenant = tenant,
                 User = user,
                 Db = db,
-                Service = new DocumentService(db, new AuthorizationService(db), userContext, tenantContext),
+                Service = new DocumentService(db, new AuthorizationService(db), userContext, tenantContext,
+                    FakeConnectorResolver.Empty),
             };
         }
 

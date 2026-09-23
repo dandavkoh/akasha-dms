@@ -32,6 +32,11 @@ public static class DependencyInjection
             .Bind(configuration.GetSection(CorsOptions.SectionName))
             .ValidateOnStart();
 
+        services.AddOptions<List<Akasha.Infrastructure.Storage.ConfiguredConnectorOptions>>()
+            .Bind(configuration.GetSection(Akasha.Infrastructure.Storage.ConfiguredConnectorOptions.SectionName));
+        services.AddScoped<Akasha.Application.Storage.IConnectorResolver,
+            Akasha.Infrastructure.Storage.ConfiguredConnectorResolver>();
+
         var databaseOptions = configuration.GetSection(DatabaseOptions.SectionName).Get<DatabaseOptions>()
             ?? new DatabaseOptions();
 

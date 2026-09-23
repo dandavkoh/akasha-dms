@@ -1,5 +1,6 @@
 using Akasha.Application.Authorization;
 using Akasha.Application.Common;
+using Akasha.Application.Storage;
 using Akasha.Application.Tenancy;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
@@ -23,6 +24,7 @@ public sealed class ProblemExceptionHandler(IProblemDetailsService problemDetail
             TenantResolutionException => (StatusCodes.Status403Forbidden, "Forbidden."),
             NotFoundException notFound => (StatusCodes.Status404NotFound, notFound.Message),
             ConflictException conflict => (StatusCodes.Status409Conflict, conflict.Message),
+            StorageException storage => StorageStatus(storage),
             ValidationException validation => (StatusCodes.Status400BadRequest, validation.Message),
             _ => (0, null),
         };
@@ -44,4 +46,19 @@ public sealed class ProblemExceptionHandler(IProblemDetailsService problemDetail
         });
         return true;
     }
+
+    /// <summary>Maps normalized storage failures. Unknown kinds fall through to the generic 500 handler.</summary>
+    private static (int Status, string Detail) StorageStatus(StorageException exception)
+        => exception.Kind switch
+        {
+            StorageErrorKind.NotFound => (StatusCodes.Status404NotFound, "The physical file was not found."),
+            StorageErrorKind.AccessDenied => (StatusCodes.Status403Forbidden, "The storage system denied access."),
+            StorageErrorKind.ConcurrencyConflict => (StatusCodes.Status409Conflict, "The file changed since the known version; reload and retry."),
+            StorageErrorKind.Conflict => (StatusCodes.Status409Conflict, "Storage conflict: the destination may already exist."),
+            StorageErrorKind.Validation => (StatusCodes.Status400BadRequest, exception.Message),
+            StorageErrorKind.Unavailable => (StatusCodes.Status503ServiceUnavailable, "The storage system is currently unavailable."),
+            StorageErrorKind.AuthenticationRequired => (StatusCodes.Status503ServiceUnavailable, "The storage connector requires re-authentication."),
+            StorageErrorKind.UnsupportedOperation => (StatusCodes.Status400BadRequest, exception.Message),
+            _ => (0, null!),
+        };
 }
