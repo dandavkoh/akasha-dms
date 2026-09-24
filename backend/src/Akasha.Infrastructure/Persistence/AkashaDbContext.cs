@@ -60,6 +60,9 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // Trigram text search (document name search, rule #44); created by migration.
+        modelBuilder.HasPostgresExtension("pg_trgm");
+
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AkashaDbContext).Assembly);
 
         foreach (var entityType in modelBuilder.Model.GetEntityTypes())

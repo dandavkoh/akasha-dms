@@ -33,6 +33,12 @@ internal sealed class DocumentConfiguration : IEntityTypeConfiguration<Document>
 
         builder.HasIndex(document => new { document.TenantId, document.Name });
 
+        // Trigram index so case-insensitive substring search (ILike '%q%') on the document
+        // name uses an index instead of a sequential scan. Requires the pg_trgm extension.
+        builder.HasIndex(document => document.Name)
+            .HasMethod("gin")
+            .HasOperators("gin_trgm_ops");
+
         builder.HasOne<Tenant>()
             .WithMany()
             .HasForeignKey(document => document.TenantId)

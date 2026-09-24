@@ -20,6 +20,7 @@ namespace Akasha.Infrastructure.Migrations
                 .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
+            NpgsqlModelBuilderExtensions.HasPostgresExtension(modelBuilder, "pg_trgm");
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
             modelBuilder.Entity("Akasha.Domain.Akten.Akte", b =>
@@ -349,6 +350,12 @@ namespace Akasha.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_documents");
+
+                    b.HasIndex("Name")
+                        .HasDatabaseName("ix_documents_name");
+
+                    NpgsqlIndexBuilderExtensions.HasMethod(b.HasIndex("Name"), "gin");
+                    NpgsqlIndexBuilderExtensions.HasOperators(b.HasIndex("Name"), new[] { "gin_trgm_ops" });
 
                     b.HasIndex("TenantId", "Name")
                         .HasDatabaseName("ix_documents_tenant_id_name");
