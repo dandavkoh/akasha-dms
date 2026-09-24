@@ -449,6 +449,142 @@ namespace Akasha.Infrastructure.Migrations
                     b.ToTable("user_identities", (string)null);
                 });
 
+            modelBuilder.Entity("Akasha.Domain.Metadata.MetadataDefinition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at_utc");
+
+                    b.Property<string>("FieldType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("field_type");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_required");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("key");
+
+                    b.Property<string>("Label")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("label");
+
+                    b.Property<int?>("MaxLength")
+                        .HasColumnType("integer")
+                        .HasColumnName("max_length");
+
+                    b.PrimitiveCollection<string[]>("Options")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("options");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_metadata_definitions");
+
+                    b.HasIndex("TenantId", "Key")
+                        .IsUnique()
+                        .HasDatabaseName("ix_metadata_definitions_tenant_id_key");
+
+                    b.ToTable("metadata_definitions", (string)null);
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Metadata.MetadataValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool?>("BooleanValue")
+                        .HasColumnType("boolean")
+                        .HasColumnName("boolean_value");
+
+                    b.Property<DateOnly?>("DateValue")
+                        .HasColumnType("date")
+                        .HasColumnName("date_value");
+
+                    b.Property<Guid>("DefinitionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("definition_id");
+
+                    b.Property<decimal?>("NumberValue")
+                        .HasColumnType("numeric")
+                        .HasColumnName("number_value");
+
+                    b.Property<Guid>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("OwnerType")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("owner_type");
+
+                    b.PrimitiveCollection<string[]>("SelectionValues")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("selection_values");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("TextValue")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)")
+                        .HasColumnName("text_value");
+
+                    b.Property<DateTimeOffset?>("TimestampValue")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("timestamp_value");
+
+                    b.Property<DateTimeOffset>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at_utc");
+
+                    b.HasKey("Id")
+                        .HasName("pk_metadata_values");
+
+                    b.HasIndex("DefinitionId")
+                        .HasDatabaseName("ix_metadata_values_definition_id");
+
+                    b.HasIndex("TenantId", "DefinitionId")
+                        .HasDatabaseName("ix_metadata_values_tenant_id_definition_id");
+
+                    b.HasIndex("TenantId", "OwnerType", "OwnerId", "DefinitionId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_metadata_values_tenant_id_owner_type_owner_id_definition_id");
+
+                    b.ToTable("metadata_values", (string)null);
+                });
+
             modelBuilder.Entity("Akasha.Domain.Storage.ConnectorSyncCheckpoint", b =>
                 {
                     b.Property<Guid>("Id")
@@ -749,6 +885,33 @@ namespace Akasha.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_user_identities_users_user_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Metadata.MetadataDefinition", b =>
+                {
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_metadata_definitions_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Akasha.Domain.Metadata.MetadataValue", b =>
+                {
+                    b.HasOne("Akasha.Domain.Metadata.MetadataDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("DefinitionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_metadata_values_metadata_definitions_definition_id");
+
+                    b.HasOne("Akasha.Domain.Tenants.Tenant", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_metadata_values_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Akasha.Domain.Storage.ConnectorSyncCheckpoint", b =>
