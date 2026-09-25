@@ -14,6 +14,10 @@ internal sealed class CorrelationIdMiddleware(RequestDelegate next)
         }
 
         context.Items[ItemKey] = correlationId;
+        // Ambient context for the request scope: captured by services that enqueue
+        // background work, so jobs keep the originating correlation id.
+        context.RequestServices.GetRequiredService<Akasha.Application.Common.ICorrelationContext>()
+            .Establish(correlationId);
         context.Response.OnStarting(() =>
         {
             context.Response.Headers[HeaderName] = correlationId;

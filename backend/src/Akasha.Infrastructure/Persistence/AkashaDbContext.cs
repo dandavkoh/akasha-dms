@@ -6,6 +6,7 @@ using Akasha.Domain.Authorization;
 using Akasha.Domain.Common;
 using Akasha.Domain.Documents;
 using Akasha.Domain.Identity;
+using Akasha.Domain.Jobs;
 using Akasha.Domain.Metadata;
 using Akasha.Domain.Storage;
 using Akasha.Domain.Tenants;
@@ -57,6 +58,8 @@ public sealed class AkashaDbContext(DbContextOptions<AkashaDbContext> options, I
     public DbSet<MetadataDefinition> MetadataDefinitions => Set<MetadataDefinition>();
 
     public DbSet<MetadataValue> MetadataValues => Set<MetadataValue>();
+
+    public DbSet<BackgroundJob> BackgroundJobs => Set<BackgroundJob>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -9,6 +9,7 @@ using Akasha.Infrastructure.Authorization;
 using Akasha.Infrastructure.Configuration;
 using Akasha.Infrastructure.Documents;
 using Akasha.Infrastructure.Identity;
+using Akasha.Infrastructure.Jobs;
 using Akasha.Infrastructure.Persistence;
 using Akasha.Infrastructure.Tenancy;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +43,15 @@ public static class DependencyInjection
 
         services.AddScoped<ITenantContext, TenantContext>();
         services.AddScoped<ICurrentUser, CurrentUserContext>();
+        services.AddScoped<Akasha.Application.Common.ICorrelationContext,
+            Akasha.Application.Common.CorrelationContext>();
+
+        services.AddOptions<BackgroundJobOptions>()
+            .Bind(configuration.GetSection(BackgroundJobOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        services.AddScoped<Akasha.Application.Jobs.IBackgroundJobQueue, BackgroundJobQueue>();
+        services.AddHostedService<BackgroundJobWorker>();
         services.AddScoped<IIdentityResolver, IdentityResolver>();
         services.AddScoped<IAuthorizationService, AuthorizationService>();
         services.AddScoped<ITenantQueries, TenantQueries>();
